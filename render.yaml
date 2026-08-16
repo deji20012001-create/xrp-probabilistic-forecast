@@ -30,6 +30,8 @@ services:
   - type: keyvalue
     name: xrp-forecast-cache
     plan: starter
+    # Keep Redis private; the web service connects over Render's internal network.
+    ipAllowList: []
 
 databases:
   - name: xrp-forecast-db
