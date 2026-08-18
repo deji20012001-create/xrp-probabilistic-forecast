@@ -35,7 +35,6 @@ services:
 
 databases:
   - name: xrp-forecast-db
-    plan: starter
+    plan: basic_256mb
     databaseName: xrp_forecast
     user: xrp_forecast
-
