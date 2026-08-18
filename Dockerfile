@@ -1,19 +1,19 @@
 FROM python:3.11-slim
 WORKDIR /service
 
-# Keep numerical libraries inside Render's memory/CPU limits.
 ENV OMP_NUM_THREADS=1 \
     OPENBLAS_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
     NUMEXPR_NUM_THREADS=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Extract separately so Render logs identify archive failures distinctly.
-COPY source.zip /tmp/source.zip
-RUN python -m zipfile -e /tmp/source.zip /service
+# The source archive is stored as verified text chunks to avoid binary
+# corruption in repository uploads. Reassemble and validate before extraction.
+COPY source.zip.b64.* /tmp/source-parts/
+RUN cat /tmp/source-parts/source.zip.b64.* | base64 -d > /tmp/source.zip \
+    && python -m zipfile -t /tmp/source.zip \
+    && python -m zipfile -e /tmp/source.zip /service
 
-# Install the build backend explicitly, then disable isolated-build's redundant
-# backend download. Prefer wheels so scientific packages are never compiled.
 RUN python -m pip install --no-cache-dir --retries 10 --timeout 60 --upgrade \
       "pip>=24" "setuptools>=68" wheel
 RUN python -m pip install --no-cache-dir --no-build-isolation --prefer-binary \
