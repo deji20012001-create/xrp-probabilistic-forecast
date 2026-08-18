@@ -1,14 +1,17 @@
 FROM python:3.11-slim
 WORKDIR /service
 
+# LightGBM wheels require the GNU OpenMP runtime on Debian slim.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV OMP_NUM_THREADS=1 \
     OPENBLAS_NUM_THREADS=1 \
     MKL_NUM_THREADS=1 \
     NUMEXPR_NUM_THREADS=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# The source archive is stored as verified text chunks to avoid binary
-# corruption in repository uploads. Reassemble and validate before extraction.
 COPY source.zip.b64.* /tmp/source-parts/
 RUN cat /tmp/source-parts/source.zip.b64.* | base64 -d > /tmp/source.zip \
     && python -m zipfile -t /tmp/source.zip \
