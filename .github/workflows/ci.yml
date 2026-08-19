@@ -1,0 +1,40 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct and validate source archive
+        run: |
+          cat source.zip.b64.* | base64 --decode > /tmp/source.zip
+          python -m zipfile -t /tmp/source.zip
+      - name: Build production image
+        run: docker build -t xrp-forecast-ci .
+      - name: Start API
+        run: |
+          docker run -d --name xrp-ci -p 8000:8000 -e PROVIDER=demo xrp-forecast-ci
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:8000/health && break
+            if [ "$i" = 30 ]; then docker logs xrp-ci; exit 1; fi
+            sleep 2
+          done
+      - name: API and dashboard smoke tests
+        run: |
+          curl -fsS http://127.0.0.1:8000/ready
+          curl -fsS http://127.0.0.1:8000/v1/forecast/latest | python -m json.tool > /dev/null
+          curl -fsS http://127.0.0.1:8000/v1/model/status | python -m json.tool > /dev/null
+          docker cp xrp-ci:/service/app/web/index.html /tmp/index.html
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          html = Path('/tmp/index.html').read_text()
+          scripts = re.findall(r'<script[^>]*>(.*?)</script>', html, re.S)
+          assert scripts, 'dashboard script missing'
+          Path('/tmp/dashboard.js').write_text(scripts[-1])
+          PY
+          node --check /tmp/dashboard.js
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs xrp-ci || true
+
