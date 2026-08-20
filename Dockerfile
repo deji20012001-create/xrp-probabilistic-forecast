@@ -13,7 +13,11 @@ ENV OMP_NUM_THREADS=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY source.zip.b64.* /tmp/source-parts/
-RUN cat /tmp/source-parts/source.zip.b64.* | base64 -d > /tmp/source.zip \
+# GitHub's text API may normalize each chunk with CRLF. Strip transport
+# whitespace before strict base64 decoding, then test the archive before use.
+RUN cat /tmp/source-parts/source.zip.b64.* \
+    | tr -d '\r\n' \
+    | base64 -d > /tmp/source.zip \
     && python -m zipfile -t /tmp/source.zip \
     && python -m zipfile -e /tmp/source.zip /service
 
